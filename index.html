@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>科學探究保衛戰 - v999 Final Template</title>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        @keyframes pulse-fast { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .animate-pulse-fast { animation: pulse-fast 1s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        
+        /* 路線動畫 */
+        @keyframes dash {
+            to { stroke-dashoffset: -1; }
+        }
+        .path-line {
+            /* 移除了 vector-effect，確保線條有正確的粗度 */
+            animation: dash 1s linear infinite;
+        }
+
+        /* 核心設定：百分比流動佈局 (手機完美適配) */
+        html, body {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            overflow: hidden;
+            background-color: #0f172a;
+            color: white;
+            font-family: system-ui, -apple-system, sans-serif;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+        }
+        #root { width: 100%; height: 100%; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // --- ICONS (Science Theme) ---
+        const IconBase = ({ children, size = "100%", className = "", ...props }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>{children}</svg>
+        );
+        const Heart = (p) => <IconBase {...p}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></IconBase>;
+        const Shield = (p) => <IconBase {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></IconBase>;
+        const Play = (p) => <IconBase {...p}><polygon points="5 3 19 12 5 21 5 3"/></IconBase>;
+        const Volume2 = (p) => <IconBase {...p}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></IconBase>;
+        const VolumeX = (p) => <IconBase {...p}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></IconBase>;
+        const Eye = (p) => <IconBase {...p}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></IconBase>;
+        const Lightbulb = (p) => <IconBase {...p}><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></IconBase>;
+        const Flask = (p) => <IconBase {...p}><path d="M10 2v7.31"/><path d="M14 2v7.31"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/><path d="M5.52 16h12.96"/></IconBase>;
+        const Atom = (p) => <IconBase {...p}><circle cx="12" cy="12" r="1"/><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/><path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/></IconBase>;
+        const Hand = (p) => <IconBase {...p}><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></IconBase>;
+        const Beaker = (p) => <IconBase {...p}><path d="M4.5 3h15"/><path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3"/><path d="M6 14h12"/></IconBase>;
+        const XCircle = (p) => <IconBase {...p}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></IconBase>;
+        const ArrowUpCircle = (p) => <IconBase {...p}><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4"/><path d="M12 16V8"/></IconBase>;
+        
+        // Enemy Icons
+        const Ghost = (p) => <IconBase {...p}><path d="M9 22v-2a2 2 0 0 1 4 0v2"/><path d="M9 22v-2a2 2 0 0 1 4 0v2"/><path d="M9 22v-2a2 2 0 0 1 4 0v2"/><path d="M18.5 12A6.5 6.5 0 0 0 5.5 12c0 2 .5 3.5 2.5 4.5v3c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2v-3c2-1 2.5-2.5 2.5-4.5Z"/><circle cx="10" cy="10" r="1"/><circle cx="14" cy="10" r="1"/></IconBase>;
+        const Skull = (p) => <IconBase {...p}><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/><path d="m12.5 17-.5-1-.5 1h1z"/><path d="M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20"/></IconBase>;
+        const Bug = (p) => <IconBase {...p}><rect width="8" height="12" x="8" y="6" rx="4"/><path d="m19 7-3 3"/><path d="m5 7 3 3"/><path d="m19 19-3-3"/><path d="m5 19 3-3"/><path d="M20 13h-4"/><path d="M4 13h4"/><path d="m10 4 1 2"/><path d="m14 4-1 2"/></IconBase>;
+        const Flame = (p) => <IconBase {...p}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.2.6-3.3.7-1.9 3.8-3.3 2.9-6.2Z"/></IconBase>;
+        const Gem = (p) => <IconBase {...p}><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></IconBase>;
+        const Bot = (p) => <IconBase {...p}><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></IconBase>;
+        const CloudLightning = (p) => <IconBase {...p}><path d="M6 16.326A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973"/><path d="m13 12-3 5h4l-3 5"/></IconBase>;
+
+        // --- CONSTANTS ---
+        const GRID_W = 20;
+        const GRID_H = 12;
+        const TOWER_COST = { observe: 100, hypothesis: 200, experiment: 300 };
+        // Path coordinates (Grid: 0-19, 0-11)
+        const PATH_LEFT=[{x:0,y:5},{x:1,y:5},{x:2,y:5},{x:3,y:5},{x:4,y:5},{x:5,y:5},{x:5,y:4},{x:5,y:3},{x:6,y:3},{x:7,y:3},{x:8,y:3},{x:9,y:3},{x:10,y:3},{x:10,y:4},{x:10,y:5},{x:11,y:5},{x:12,y:5},{x:13,y:5},{x:14,y:5},{x:15,y:5},{x:16,y:5},{x:17,y:5},{x:18,y:5},{x:19,y:5}];
+        const PATH_TOP=[{x:8,y:0},{x:8,y:1},{x:8,y:2},{x:8,y:3},{x:9,y:3},{x:10,y:3},{x:10,y:4},{x:10,y:5},{x:11,y:5},{x:12,y:5},{x:13,y:5},{x:14,y:5},{x:15,y:5},{x:16,y:5},{x:17,y:5},{x:18,y:5},{x:19,y:5}];
+        const PATH_BOTTOM=[{x:12,y:11},{x:12,y:10},{x:12,y:9},{x:12,y:8},{x:12,y:7},{x:12,y:6},{x:12,y:5},{x:13,y:5},{x:14,y:5},{x:15,y:5},{x:16,y:5},{x:17,y:5},{x:18,y:5},{x:19,y:5}];
+        const ALL_PATHS = [PATH_LEFT, PATH_TOP, PATH_BOTTOM];
+
+        const AudioEngine = {
+          ctx: null, isMuted: false,
+          init: () => { if (!AudioEngine.ctx) AudioEngine.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+          playTone: (freq, type, duration, vol = 0.1) => {
+            if (AudioEngine.isMuted || !AudioEngine.ctx) return;
+            const osc = AudioEngine.ctx.createOscillator(); const gain = AudioEngine.ctx.createGain();
+            osc.type = type; osc.frequency.setValueAtTime(freq, AudioEngine.ctx.currentTime);
+            gain.gain.setValueAtTime(vol, AudioEngine.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, AudioEngine.ctx.currentTime + duration);
+            osc.connect(gain); gain.connect(AudioEngine.ctx.destination);
+            osc.start(); osc.stop(AudioEngine.ctx.currentTime + duration);
+          },
+          playShoot: () => AudioEngine.playTone(400, 'square', 0.1, 0.05),
+          playHit: () => AudioEngine.playTone(100, 'sawtooth', 0.1, 0.05),
+          playBuild: () => AudioEngine.playTone(600, 'sine', 0.2, 0.1),
+          playWin: () => { [523.25, 659.25, 783.99, 1046.50].forEach((f, i) => setTimeout(() => AudioEngine.playTone(f, 'square', 0.3, 0.1), i * 100)); },
+          toggleMute: () => { AudioEngine.isMuted = !AudioEngine.isMuted; return AudioEngine.isMuted; }
+        };
+
+        // --- PURE SCIENCE QUESTION BANK ---
+        const FULL_QUESTION_BANK = [
+          { id: 1, qZh: "科學探究的第一步通常是？", qEn: "First step of inquiry?", options: [{t:"觀察及提問 (Observe & Ask)",c:true}, {t:"進行測試 (Test)",c:false}, {t:"得出結論 (Conclusion)",c:false}], expl: "觀察現象並提出問題是開始。" },
+          { id: 2, qZh: "甚麼是「假設」？", qEn: "What is a 'Hypothesis'?", options: [{t:"對問題的暫時解釋 (Temporary Explanation)",c:true}, {t:"最終的真理 (Final Truth)",c:false}, {t:"隨便的猜想 (Random Guess)",c:false}], expl: "根據知識經驗提出的暫時解釋，有待驗證。" },
+          { id: 3, qZh: "提出假設後，下一步是？", qEn: "After hypothesis?", options: [{t:"設計並進行測試 (Design Test)",c:true}, {t:"直接寫報告 (Write Report)",c:false}, {t:"放棄研究 (Give Up)",c:false}], expl: "必須透過測試來驗證假設是否正確。" },
+          { id: 4, qZh: "如果測試結果支持假設，我們可以？", qEn: "If result supports hypothesis?", options: [{t:"建立新知識 (Establish Knowledge)",c:true}, {t:"修改數據 (Change Data)",c:false}, {t:"推翻假設 (Overturn)",c:false}], expl: "經過分析確認後，可建立為新知識。" },
+          { id: 5, qZh: "如果測試結果不支援假設，應該？", qEn: "If result rejects hypothesis?", options: [{t:"修正假設再測試 (Revise & Retest)",c:true}, {t:"強行接受 (Force Accept)",c:false}, {t:"偽造結果 (Fake Result)",c:false}], expl: "誠實面對結果，重新思考並修正假設。" },
+          { id: 6, qZh: "甚麼是「公平測試」？", qEn: "What is a 'Fair Test'?", options: [{t:"只改變一個變因 (Change 1 Variable)",c:true}, {t:"改變所有變因 (Change All)",c:false}, {t:"不改變變因 (Change None)",c:false}], expl: "為了準確，只能改變一個要測試的條件。" },
+          { id: 7, qZh: "測試「冰的大小」對融化速度的影響，應改變甚麼？", qEn: "Test 'Ice Size', change what?", options: [{t:"冰塊的大小 (Size of Ice)",c:true}, {t:"水的溫度 (Water Temp)",c:false}, {t:"杯子的物料 (Cup Material)",c:false}], expl: "要測試甚麼，就改變甚麼。" },
+          { id: 8, qZh: "在上述測試中，甚麼必須保持不變？", qEn: "What must keep SAME?", options: [{t:"水的溫度 (Water Temp)",c:true}, {t:"冰的大小 (Ice Size)",c:false}, {t:"觀察者 (Observer)",c:false}], expl: "其他因素（如水溫）必須相同才公平。" },
+          { id: 9, qZh: "為什麼要做公平測試？", qEn: "Why Fair Test?", options: [{t:"確保結果準確 (Accurate Result)",c:true}, {t:"比較好玩 (More Fun)",c:false}, {t:"節省時間 (Save Time)",c:false}], expl: "排除其他因素干擾，確保結果可信。" },
+          { id: 10, qZh: "古人曾經相信地球是甚麼形狀？", qEn: "Ancient belief of Earth?", options: [{t:"平的 (Flat)",c:true}, {t:"圓的 (Round)",c:false}, {t:"方形的 (Square)",c:false}], expl: "古代曾流行「地平說」。" },
+          { id: 11, qZh: "甚麼證據推翻了「地平說」？", qEn: "Evidence against Flat Earth?", options: [{t:"衛星照片/航海 (Photos/Sailing)",c:true}, {t:"神話傳說 (Myths)",c:false}, {t:"個人感覺 (Feelings)",c:false}], expl: "太空照片和環球航行提供了實證。" },
+          { id: 12, qZh: "科學知識會改變嗎？", qEn: "Does scientific knowledge change?", options: [{t:"會，隨新證據改變 (Yes)",c:true}, {t:"不會，永遠不變 (No)",c:false}, {t:"看心情 (Depends)",c:false}], expl: "當發現新證據，舊知識會被修正。" },
+          { id: 13, qZh: "這顯示了科學家甚麼精神？", qEn: "Scientist's spirit?", options: [{t:"不被舊信念束縛 (Not bound by old)",c:true}, {t:"盲目相信古人 (Blind Trust)",c:false}, {t:"固步自封 (Stubborn)",c:false}], expl: "勇於根據證據挑戰舊有觀念。" },
+          { id: 14, qZh: "科學家應重視甚麼？", qEn: "Scientists should respect?", options: [{t:"證據和事實 (Evidence/Facts)",c:true}, {t:"個人喜好 (Preference)",c:false}, {t:"權威人士 (Authority)",c:false}], expl: "證據是科學的基礎。" },
+          { id: 15, qZh: "「不盲從權威」意思是？", qEn: "Not bound by authority?", options: [{t:"敢於挑戰舊觀念 (Challenge Old)",c:true}, {t:"不聽老師話 (Ignore Teacher)",c:false}, {t:"自以為是 (Arrogant)",c:false}], expl: "不因為是權威說的就全信，要看證據。" },
+          { id: 16, qZh: "科學探究需要甚麼態度？", qEn: "Required attitude?", options: [{t:"常存懷疑 (Always Doubt)",c:true}, {t:"輕易相信 (Easily Believe)",c:false}, {t:"馬馬虎虎 (Careless)",c:false}], expl: "對事物保持好奇和懷疑，尋求真相。" },
+          { id: 17, qZh: "觀察時應該？", qEn: "When observing?", options: [{t:"運用多種感官 (Use Senses)",c:true}, {t:"只用眼睛 (Eyes Only)",c:false}, {t:"閉上眼睛 (Close Eyes)",c:false}], expl: "眼看、耳聽、手觸等都是觀察。" },
+          { id: 18, qZh: "愛迪生發明電燈失敗多次仍繼續，這是？", qEn: "Edison kept trying, this is?", options: [{t:"堅毅 (Perseverance)",c:true}, {t:"固執 (Stubbornness)",c:false}, {t:"運氣 (Luck)",c:false}], expl: "屢敗屢戰是堅毅的科學精神。" },
+          { id: 19, qZh: "如果要量度水的體積，應使用？", qEn: "Measure water volume with?", options: [{t:"量筒 (Measuring Cylinder)",c:true}, {t:"直尺 (Ruler)",c:false}, {t:"溫度計 (Thermometer)",c:false}], expl: "量筒是測量液體體積的工具。" },
+          { id: 20, qZh: "如果要量度水的熱度，應使用？", qEn: "Measure water heat with?", options: [{t:"溫度計 (Thermometer)",c:true}, {t:"量杯 (Beaker)",c:false}, {t:"天平 (Balance)",c:false}], expl: "溫度計用於測量溫度。" }
+        ];
+
+        function App() {
+          const [gameState, setGameState] = useState('menu');
+          const [wave, setWave] = useState(1);
+          const [money, setMoney] = useState(300); 
+          const [lives, setLives] = useState(15); 
+          const [draggedType, setDraggedType] = useState(null);
+          const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
+          const [selectedTowerId, setSelectedTowerId] = useState(null);
+          const [currentQ, setCurrentQ] = useState(FULL_QUESTION_BANK[0]); 
+          const [feedback, setFeedback] = useState(null);
+          const [isMuted, setIsMuted] = useState(false);
+          const [hoverGrid, setHoverGrid] = useState(null);
+          const [, setTick] = useState(0);
+          
+          const questionDeckRef = useRef([]);
+          const enemiesRef = useRef([]);
+          const towersRef = useRef([]);
+          const projectilesRef = useRef([]);
+          const particlesRef = useRef([]);
+          const lastTimeRef = useRef(0);
+          const waveActiveRef = useRef(false);
+          const enemiesSpawnedRef = useRef(0);
+          const lastSpawnTimeRef = useRef(0);
+          const requestRef = useRef(0);
+          const boardRef = useRef(null);
+
+          const isValidBuild = (x, y) => { 
+            if (x < 0 || x >= GRID_W || y < 0 || y >= GRID_H) return false;
+            if (ALL_PATHS.some(path => path.some(p => p.x === x && p.y === y))) return false;
+            if (towersRef.current.some(t => t.x === x && t.y === y)) return false;
+            if (x >= 18 && y >= 4 && y <= 6) return false;
+            return true; 
+          };
+
+          const getEnemyPos = (e) => { 
+             const path = ALL_PATHS[e.pathId]; 
+             const curr = path[e.pathIndex]; 
+             const next = path[e.pathIndex + 1] || curr; 
+             // Percentage Logic for V6.0 structure
+             return { 
+                 x: curr.x + (next.x - curr.x) * e.progress, 
+                 y: curr.y + (next.y - curr.y) * e.progress 
+             }; 
+          };
+
+          const pickNewQuestion = () => { if (questionDeckRef.current.length === 0) questionDeckRef.current = FULL_QUESTION_BANK.map((_, i) => i); const r = Math.floor(Math.random() * questionDeckRef.current.length); const q = questionDeckRef.current[r]; questionDeckRef.current.splice(r, 1); setCurrentQ(FULL_QUESTION_BANK[q]); };
+          const toggleMute = () => { setIsMuted(AudioEngine.toggleMute()); };
+
+          const animate = useCallback((time) => {
+            if (lastTimeRef.current === 0) lastTimeRef.current = time;
+            const deltaTime = time - lastTimeRef.current;
+            lastTimeRef.current = time;
+            const dtFactor = deltaTime / 16.67;
+
+            if (waveActiveRef.current) {
+              const totalEnemies = 8 + (wave * 3); 
+              const spawnInterval = Math.max(400, 1600 - (wave * 100)); 
+              if (enemiesSpawnedRef.current < totalEnemies) {
+                if (time - lastSpawnTimeRef.current > spawnInterval) {
+                  let pathId = 0;
+                  if (wave >= 2 && Math.random() > 0.6) pathId = 1;
+                  if (wave >= 3 && Math.random() > 0.7) pathId = 2;
+                  let type = 'ghost'; let baseHp = 50 * Math.pow(1.18, wave); let baseSpeed = 0.0055 * Math.pow(1.05, wave); const rand = Math.random();
+                  
+                  if (wave >= 8 && rand > 0.97) { type = 'boss'; baseSpeed *= 0.4; baseHp *= 12; }
+                  else if (wave >= 6 && rand > 0.9) { type = 'flame'; baseSpeed *= 2.0; baseHp *= 0.8; }
+                  else if (wave >= 4 && rand > 0.8) { type = 'robot'; baseSpeed *= 0.5; baseHp *= 3.0; }
+                  else if (wave >= 2 && rand > 0.85) { type = 'bat'; baseSpeed *= 1.8; baseHp *= 0.5; }
+                  else if (wave >= 3 && rand > 0.75) { type = 'skull'; baseSpeed *= 0.7; baseHp *= 2.0; }
+                  else if (wave >= 2 && rand > 0.6) { type = 'bug'; baseSpeed *= 1.4; baseHp *= 0.7; }
+                  enemiesRef.current.push({ id: Math.random(), pathId, pathIndex: 0, progress: 0, hp: baseHp, maxHp: baseHp, speed: baseSpeed, type, visualOffset: 0 });
+                  enemiesSpawnedRef.current++; lastSpawnTimeRef.current = time;
+                }
+              } else if (enemiesRef.current.length === 0) {
+                waveActiveRef.current = false; if (wave < 12) setGameState('quiz'); else setGameState('victory'); AudioEngine.playWin();
+              }
+            }
+
+            enemiesRef.current.forEach(e => { 
+                if (e.frozen && e.frozen > time) return; 
+                e.progress += e.speed * dtFactor; 
+                e.visualOffset = e.type === 'bat' ? Math.sin(time / 50) * 0.5 : Math.sin(time / 100) * 0.2; 
+                if (e.progress >= 1) { 
+                    e.pathIndex++; e.progress = 0; 
+                    const path = ALL_PATHS[e.pathId]; 
+                    if (e.pathIndex >= path.length - 1) { 
+                        e.hp = -1; setLives(l => { if (l - 1 <= 0) setGameState('gameover'); return l - 1; }); 
+                    } 
+                } 
+            });
+
+            towersRef.current.forEach(t => {
+              if (time - t.lastFired > t.cooldown) {
+                const target = enemiesRef.current.find(e => { 
+                    if (e.hp <= 0) return false; 
+                    const pos = getEnemyPos(e); 
+                    const dist = Math.sqrt(Math.pow(pos.x - (t.x), 2) + Math.pow(pos.y - (t.y), 2)); 
+                    return dist <= t.range; 
+                });
+                if (target) {
+                  const tPos = getEnemyPos(target); 
+                  const visY = tPos.y + (target.visualOffset || 0);
+
+                  if (t.type === 'experiment') { 
+                      target.hp -= t.damage; 
+                      particlesRef.current.push({ id: Math.random(), x: t.x+0.5, y: t.y+0.5, life: 10, color: 'cyan' }); 
+                      const freezeTime = (target.type === 'boss' || target.type === 'robot') ? 100 : 200; target.frozen = time + freezeTime; 
+                      projectilesRef.current.push({ id: Math.random(), x: tPos.x+0.5, y: visY+0.5, startX: t.x+0.5, startY: t.y+0.5, targetId: target.id, speed: 0, damage: 0, type: 'laser', life: 5 }); 
+                      AudioEngine.playShoot(); 
+                  } else { 
+                      projectilesRef.current.push({ id: Math.random(), x: t.x + 0.5, y: t.y + 0.5, targetId: target.id, speed: 0.7, damage: t.damage, type: t.type === 'observe' ? 'box' : 'coin' }); 
+                      AudioEngine.playShoot(); 
+                  }
+                  t.lastFired = time;
+                }
+              }
+            });
+
+            projectilesRef.current = projectilesRef.current.filter(p => { 
+                if (p.type === 'laser') { p.life = (p.life || 0) - 1; return p.life > 0; } 
+                const target = enemiesRef.current.find(e => e.id === p.targetId); 
+                if (!target || target.hp <= 0) return false; 
+                
+                const pos = getEnemyPos(target); 
+                const visualShiftY = (target.visualOffset || 0) / 40;
+                
+                const tx = pos.x + 0.5; const ty = pos.y + 0.5 + visualShiftY; 
+                const dx = tx - p.x; const dy = ty - p.y; 
+                const dist = Math.sqrt(dx*dx + dy*dy); 
+                const moveDist = p.speed * dtFactor; 
+                if (dist < moveDist) { 
+                    target.hp -= p.damage; 
+                    particlesRef.current.push({ id: Math.random(), x: tx, y: ty, life: 20, color: p.type === 'box' ? 'orange' : 'yellow' }); 
+                    AudioEngine.playHit(); 
+                    return false; 
+                } else { 
+                    p.x += (dx / dist) * moveDist; 
+                    p.y += (dy / dist) * moveDist; 
+                    return true; 
+                } 
+            });
+
+            particlesRef.current.forEach(p => p.life -= 1 * dtFactor); 
+            particlesRef.current = particlesRef.current.filter(p => p.life > 0); 
+            enemiesRef.current = enemiesRef.current.filter(e => e.hp > 0);
+
+            setTick(prev => prev + 1); 
+            if (gameState === 'playing') requestRef.current = requestAnimationFrame(animate);
+          }, [gameState, wave]);
+
+          useEffect(() => { AudioEngine.init(); if (gameState === 'playing') requestRef.current = requestAnimationFrame(animate); return () => cancelAnimationFrame(requestRef.current); }, [gameState, animate]);
+
+          const handleDragStart = (type, e) => {
+            if (e.type === 'touchstart') e.preventDefault();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            if (money >= TOWER_COST[type]) { setDraggedType(type); setDragPos({ x: clientX, y: clientY }); setSelectedTowerId(null); }
+          };
+
+          useEffect(() => {
+            if (!draggedType) { setHoverGrid(null); return; }
+            const handleMove = (e) => {
+                if (e.type === 'touchmove') e.preventDefault();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                setDragPos({ x: clientX, y: clientY });
+
+                if (boardRef.current) {
+                   const rect = boardRef.current.getBoundingClientRect();
+                   if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+                       const relX = clientX - rect.left;
+                       const relY = clientY - rect.top;
+                       // PERCENTAGE CALCULATION
+                       const cellW = rect.width / GRID_W;
+                       const cellH = rect.height / GRID_H;
+                       const x = Math.floor(relX / cellW);
+                       const y = Math.floor(relY / cellH);
+                       setHoverGrid({x, y, valid: isValidBuild(x,y)});
+                   } else {
+                       setHoverGrid(null);
+                   }
+                }
+            };
+            const handleEnd = (e) => {
+               const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+               const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+               if (boardRef.current) {
+                   const rect = boardRef.current.getBoundingClientRect();
+                   if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+                       const cellW = rect.width / GRID_W;
+                       const cellH = rect.height / GRID_H;
+                       const x = Math.floor((clientX - rect.left) / cellW);
+                       const y = Math.floor((clientY - rect.top) / cellH);
+                       
+                       if (isValidBuild(x, y)) {
+                           AudioEngine.playBuild();
+                           let stats = { damage: 18, range: 3.5, cooldown: 550 }; 
+                           if (draggedType === 'hypothesis') stats = { damage: 75, range: 4.5, cooldown: 1300 }; 
+                           if (draggedType === 'experiment') stats = { damage: 4, range: 4, cooldown: 150 }; 
+                           towersRef.current.push({ id: Math.random(), x, y, type: draggedType, level: 1, lastFired: 0, ...stats });
+                           setMoney(prev => prev - TOWER_COST[draggedType]);
+                       }
+                   }
+               }
+               setDraggedType(null);
+               setHoverGrid(null);
+            };
+            window.addEventListener('mousemove', handleMove); window.addEventListener('touchmove', handleMove, { passive: false });
+            window.addEventListener('mouseup', handleEnd); window.addEventListener('touchend', handleEnd);
+            return () => { window.removeEventListener('mousemove', handleMove); window.removeEventListener('touchmove', handleMove); window.removeEventListener('mouseup', handleEnd); window.removeEventListener('touchend', handleEnd); };
+          }, [draggedType]);
+
+          const upgradeTower = () => { const t = towersRef.current.find(t => t.id === selectedTowerId); if (t && money >= 150) { setMoney(m => m - 150); t.level++; t.damage *= 1.3; setSelectedTowerId(null); AudioEngine.playBuild(); } };
+          const sellTower = () => { const t = towersRef.current.find(t => t.id === selectedTowerId); if (t) { setMoney(m => m + Math.floor(TOWER_COST[t.type]*0.5)); towersRef.current = towersRef.current.filter(tx => tx.id !== selectedTowerId); setSelectedTowerId(null); } };
+          const handleQuiz = (c) => { if(c) { setFeedback("經費批准！(Approved!) +$200"); setTimeout(() => { setMoney(m=>m+200); setWave(w=>w+1); pickNewQuestion(); setGameState('playing'); enemiesSpawnedRef.current=0; waveActiveRef.current=true; setFeedback(null); }, 1000); } else { setFeedback("申請被拒... (Rejected) +$50"); setTimeout(() => { setMoney(m=>m+50); setWave(w=>w+1); pickNewQuestion(); setGameState('playing'); enemiesSpawnedRef.current=0; waveActiveRef.current=true; setFeedback(null); }, 1000); } };
+          const startGame = () => { questionDeckRef.current = FULL_QUESTION_BANK.map((_, i) => i); pickNewQuestion(); setGameState('quiz'); setWave(1); setMoney(300); setLives(15); enemiesRef.current = []; towersRef.current = []; projectilesRef.current = []; AudioEngine.init(); };
+
+          return (
+            <div className="flex flex-col h-full w-full bg-slate-900 select-none overflow-hidden text-white">
+              
+              <div className="h-12 bg-slate-800 border-b border-slate-700 flex justify-between items-center px-4 shadow-md z-10 shrink-0">
+                <div className="flex gap-4 items-center text-sm md:text-base">
+                    <div className="flex items-center gap-1 text-red-400 font-bold"><Heart size={18} className="fill-current"/> {lives}</div>
+                    <div className="flex items-center gap-1 text-yellow-400 font-bold"><Atom size={18} className="fill-current"/> {money}</div>
+                    <div className="flex items-center gap-1 text-blue-400 font-bold"><Shield size={18}/> {wave}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="hidden md:inline text-xs text-slate-400 font-bold uppercase border px-2 py-0.5 rounded">v999 Template</span>
+                    <button onClick={toggleMute} className="text-slate-400 hover:text-white p-1">
+                        {isMuted ? <VolumeX size={20}/> : <Volume2 size={20}/>}
+                    </button>
+                </div>
+              </div>
+
+              <div className="flex-1 flex items-center justify-center bg-slate-900 overflow-hidden w-full relative p-2">
+                
+                <div 
+                    ref={boardRef}
+                    className="relative bg-slate-800 shadow-2xl border-2 border-slate-700 mx-auto"
+                    style={{
+                        width: '100%',
+                        height: 'auto',
+                        maxHeight: '100%',
+                        maxWidth: '100%',
+                        aspectRatio: '20/12',
+                        backgroundImage: `linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px)`,
+                        backgroundSize: `5% 8.333%`
+                    }}
+                >
+                    {/* Hover Grid Highlight */}
+                    {hoverGrid && (
+                        <div 
+                            className={`absolute z-0 border-2 ${hoverGrid.valid ? 'border-green-400 bg-green-500/30' : 'border-red-400 bg-red-500/30'}`}
+                            style={{ 
+                                left: `${hoverGrid.x * 5}%`, 
+                                top: `${hoverGrid.y * 8.333}%`, 
+                                width: '5%', height: '8.333%' 
+                            }}
+                        />
+                    )}
+
+                    {/* PATH VISUALIZATION - Added as requested, strokeWidth 0.3 */}
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-40" viewBox="0 0 20 12" preserveAspectRatio="none">
+                        {ALL_PATHS.map((path, i) => (
+                            <polyline key={i} 
+                                points={path.map(p => `${p.x + 0.5},${p.y + 0.5}`).join(' ')}
+                                fill="none" 
+                                stroke={i===0?"#ef4444":i===1?"#10b981":"#8b5cf6"} 
+                                strokeWidth="0.3" 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                                className="path-line" 
+                                strokeDasharray="0.3 0.3"
+                            />
+                        ))}
+                    </svg>
+
+                    <div className="absolute left-2 top-[35%] bg-red-500/80 px-2 py-1 rounded text-[10px] font-bold z-0">Path A</div>
+                    <div className="absolute left-[35%] top-2 bg-green-500/80 px-2 py-1 rounded text-[10px] font-bold z-0">Path B</div>
+                    <div className="absolute left-[55%] bottom-2 bg-purple-500/80 px-2 py-1 rounded text-[10px] font-bold z-0">Path C</div>
+
+                    <div className="absolute right-[2%] top-[42%] w-[8%] h-[15%] flex items-center justify-center z-0">
+                        <div className="w-full h-full bg-blue-600 rounded-full border-2 border-white flex items-center justify-center shadow-[0_0_10px_blue] animate-pulse">
+                            <Beaker className="text-white w-2/3 h-2/3"/>
+                        </div>
+                    </div>
+
+                    {towersRef.current.map(t => (
+                        <div key={t.id} onClick={(e) => { e.stopPropagation(); setSelectedTowerId(t.id); }}
+                            className={`absolute z-10 flex items-center justify-center ${selectedTowerId===t.id?'scale-110 z-20':''}`}
+                            style={{ left: `${t.x*5}%`, top: `${t.y*8.333}%`, width: '5%', height: '8.333%' }}
+                        >
+                            <div className={`w-[80%] h-[80%] rounded shadow-lg flex items-center justify-center border-b-2 transition-all duration-200
+                                ${t.type==='observe'?'bg-orange-500 border-orange-700':t.type==='hypothesis'?'bg-yellow-500 border-yellow-700':'bg-cyan-500 border-cyan-700'}
+                                ${selectedTowerId===t.id ? 'ring-2 ring-white' : ''}
+                            `}>
+                                {t.type==='observe' && <Eye size="70%" className="text-white"/>}
+                                {t.type==='hypothesis' && <Lightbulb size="70%" className="text-white"/>}
+                                {t.type==='experiment' && <Flask size="70%" className="text-white"/>}
+                            </div>
+                            {t.level > 1 && <div className="absolute -top-1 -right-1 bg-black text-[8px] px-1 rounded-full border border-gray-600">Lv{t.level}</div>}
+                        </div>
+                    ))}
+
+                    {enemiesRef.current.map(e => {
+                        const pos = getEnemyPos(e);
+                        return (
+                            <div key={e.id} className="absolute z-20 flex flex-col items-center justify-center transition-none"
+                                style={{ 
+                                    left: `${pos.x*5 + 2.5}%`, 
+                                    top: `${pos.y*8.333 + 4.166}%`, 
+                                    transform: 'translate(-50%, -50%)',
+                                    /* V99 FIX: Render bobbing using percentages relative to cell height approx */
+                                    marginTop: `${e.visualOffset * 40}px`, // Visual offset is small float (e.g. 0.2), *40px scale
+                                    width: '5%', height: '8.333%'
+                                }}
+                            >
+                                <div className="absolute -top-[30%] w-[80%] h-[15%] bg-gray-900 border border-gray-600 rounded-sm overflow-hidden min-h-[3px]">
+                                    <div className="h-full bg-red-500 transition-all duration-100" style={{width: `${Math.max(0, (e.hp/e.maxHp)*100)}%`}}></div>
+                                </div>
+                                {e.type==='ghost' && <Ghost className="text-white drop-shadow-md w-full h-full" />}
+                                {e.type==='skull' && <Skull className="text-purple-400 drop-shadow-md w-full h-full" />}
+                                {e.type==='bug' && <Bug className="text-green-400 drop-shadow-md w-full h-full" />}
+                                {e.type==='flame' && <Flame className="text-orange-500 fill-orange-500 drop-shadow-md w-full h-full" />}
+                                {e.type==='boss' && <Gem className="text-pink-500 fill-pink-600 drop-shadow-xl w-[120%] h-[120%]" />}
+                                {e.type==='bat' && <CloudLightning className="text-yellow-300 drop-shadow-md w-full h-full" />} 
+                                {e.type==='robot' && <Bot className="text-blue-300 fill-slate-700 drop-shadow-md w-full h-full" />}
+                                {e.frozen && e.frozen > Date.now() && <div className="absolute inset-0 text-cyan-300 animate-pulse"><Zap size="100%"/></div>}
+                            </div>
+                        )
+                    })}
+
+                    {projectilesRef.current.map(p => {
+                        if (p.type === 'laser') {
+                            return (
+                            <svg key={p.id} className="absolute inset-0 w-full h-full pointer-events-none z-30">
+                                <line x1={`${p.startX*5+2.5}%`} y1={`${p.startY*8.333+4.166}%`} 
+                                      x2={`${p.x*5+2.5}%`} y2={`${p.y*8.333+4.166}%`} 
+                                      stroke="cyan" strokeWidth="2" strokeOpacity="0.8" vectorEffect="non-scaling-stroke" />
+                            </svg>
+                            )
+                        }
+                        return (
+                            <div key={p.id} className="absolute w-[1.5%] h-[2.5%] bg-white rounded-full shadow-[0_0_8px_white] z-40 transition-none border border-black/20"
+                                style={{ left: `${p.x*5+2.5}%`, top: `${p.y*8.333+4.166}%`, transform: 'translate(-50%, -50%)' }}
+                            />
+                        )
+                    })}
+
+                    {particlesRef.current.map(p => (
+                        <div key={p.id} className="absolute w-[2%] h-[3.3%] rounded-full z-20 opacity-75"
+                            style={{ 
+                                left: `${p.x*5+2.5}%`, top: `${p.y*8.333+4.166}%`, 
+                                transform: `translate(-50%, -50%) scale(${p.life/10})`,
+                                backgroundColor: p.color
+                            }}
+                        />
+                    ))}
+
+                    {(gameState==='menu'||gameState==='gameover'||gameState==='victory') && (
+                        <div className="absolute inset-0 bg-slate-900/95 z-50 flex flex-col items-center justify-center p-8 text-center">
+                            <h1 className="text-4xl md:text-5xl font-black mb-4 bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">
+                                {gameState==='menu'&&"科學探究保衛戰"}
+                                {gameState==='victory'&&"實驗成功！"}
+                                {gameState==='gameover'&&"實驗失敗..."}
+                            </h1>
+                            <button onClick={startGame} className="bg-indigo-600 px-8 py-3 rounded-full font-bold text-lg hover:bg-indigo-500 shadow-xl border-2 border-indigo-400 flex items-center gap-2">
+                                <Play fill="currentColor" size={20}/> {gameState==='menu'?"開始研究 (Start)":"重試 (Retry)"}
+                            </button>
+                        </div>
+                    )}
+
+                    {gameState==='quiz' && (
+                        <div className="absolute inset-0 bg-slate-900/95 z-50 flex items-center justify-center p-4">
+                            <div className="bg-slate-800 p-6 rounded-2xl border border-slate-600 w-[90%] max-w-md text-center shadow-2xl">
+                                <h2 className="text-xl font-bold mb-4 text-yellow-400 pb-2 border-b border-slate-700">申請研究經費 (Grant App)</h2>
+                                {!feedback ? (
+                                    <>
+                                        <p className="text-lg font-medium mb-4">{currentQ.qZh}<br/><span className="text-xs text-slate-400">{currentQ.qEn}</span></p>
+                                        <div className="grid gap-2">
+                                            {currentQ.options.map((opt,i)=>(<button key={i} onClick={()=>handleQuiz(opt.c)} className="bg-slate-700 p-3 rounded-xl active:bg-blue-600 text-left font-bold border border-slate-600 text-sm">{opt.t}</button>))}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="text-2xl font-bold animate-bounce text-green-400 py-8">{feedback}</div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+              </div>
+
+              <div className="h-24 bg-slate-900 border-t border-slate-700 shrink-0 w-full max-w-5xl mx-auto flex items-center gap-2 p-2">
+                 <div className="bg-slate-800 rounded-xl border border-slate-700 p-2 flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar shadow-lg touch-pan-x h-full">
+                     <div className="text-slate-500 text-[10px] font-bold w-12 text-center leading-tight flex flex-col items-center flex-shrink-0"><Hand size={16} className="mb-1"/>拖曳<br/>Drag</div>
+                     <div onTouchStart={(e)=>handleDragStart('observe',e)} onMouseDown={(e)=>handleDragStart('observe',e)} className={`relative p-2 rounded-lg bg-orange-900/30 border border-orange-500/50 w-20 h-full flex flex-col items-center justify-center flex-shrink-0 ${money<100?'opacity-50':''}`}>
+                         <Eye size={24} className="text-orange-400 mb-1"/><span className="text-xs font-bold text-orange-200">觀察</span><span className="text-[10px] text-yellow-400">$100</span>
+                     </div>
+                     <div onTouchStart={(e)=>handleDragStart('hypothesis',e)} onMouseDown={(e)=>handleDragStart('hypothesis',e)} className={`relative p-2 rounded-lg bg-yellow-900/30 border border-yellow-500/50 w-20 h-full flex flex-col items-center justify-center flex-shrink-0 ${money<200?'opacity-50':''}`}>
+                         <Lightbulb size={24} className="text-yellow-400 mb-1"/><span className="text-xs font-bold text-yellow-200">假設</span><span className="text-[10px] text-yellow-400">$200</span>
+                     </div>
+                     <div onTouchStart={(e)=>handleDragStart('experiment',e)} onMouseDown={(e)=>handleDragStart('experiment',e)} className={`relative p-2 rounded-lg bg-cyan-900/30 border border-cyan-500/50 w-20 h-full flex flex-col items-center justify-center flex-shrink-0 ${money<300?'opacity-50':''}`}>
+                         <Flask size={24} className="text-cyan-400 mb-1"/><span className="text-xs font-bold text-cyan-200">實驗</span><span className="text-[10px] text-yellow-400">$300</span>
+                     </div>
+                 </div>
+                 
+                 <div className="bg-slate-800 rounded-xl border border-slate-700 p-1 w-20 h-full flex flex-col justify-center gap-1 shadow-lg shrink-0">
+                     {selectedTowerId ? (
+                         <>
+                             <button onClick={upgradeTower} disabled={money<150} className={`flex-1 bg-green-600 rounded flex flex-col items-center justify-center p-1 ${money<150?'opacity-50':''}`}><ArrowUpCircle size={16}/><span className="text-[10px] font-bold">UP</span></button>
+                             <button onClick={sellTower} className="flex-1 bg-red-600 rounded flex flex-col items-center justify-center p-1"><XCircle size={16}/><span className="text-[10px] font-bold">SELL</span></button>
+                         </>
+                     ) : <div className="text-slate-500 text-[10px] text-center px-1">點擊建築<br/>升級</div>}
+                 </div>
+              </div>
+
+              {draggedType && (
+                  <div className="fixed z-50 pointer-events-none transform -translate-x-1/2 -translate-y-1/2" style={{ left: dragPos.x, top: dragPos.y - 80 }}>
+                      <div className="p-3 rounded-full bg-white/30 border-2 border-white backdrop-blur shadow-xl">
+                          {draggedType==='observe' && <Eye size={32} className="text-orange-500"/>}
+                          {draggedType==='hypothesis' && <Lightbulb size={32} className="text-yellow-500"/>}
+                          {draggedType==='experiment' && <Flask size={32} className="text-cyan-500"/>}
+                      </div>
+                  </div>
+              )}
+
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
